@@ -15,23 +15,32 @@ class PostController extends Controller
      */
     public function index ()
     {
+   
+
+        
+
         if(request('status')){
-            $posts = Post::where('status' ,request('status')) ->simplepaginate(5)->withQueryString();
+
+            $posts = Post::where('user_id' , Auth::user()->id)->where('status' ,request('status')) ->simplepaginate(5)->withQueryString();
             return view("post.index",[
                 "data" => $posts,
             ]);
         } 
+
         $search = request()->query('search');
         if($search ){
             // dd(request()->query('search'));
-            $posts = Post::where('title' , 'LIKE', "%{$search}%" )->simplepaginate(5)->withQueryString();
+            $posts = Post::where('user_id' , Auth::user()->id)->where('title' , 'LIKE', "%{$search}%" )->simplepaginate(5)->withQueryString();
         }
         else{
-          $posts = Post::simplepaginate(5);
+          $posts = Post::where('user_id' , Auth::user()->id)->simplepaginate(4);
+
+    
         }
         return view("post.index", [
             "data" => $posts,
         ]);
+   
     }
 
     /**
@@ -41,8 +50,6 @@ class PostController extends Controller
      */
     public function create()
     {
-     
-
         return view("post.create" );
     }
 
