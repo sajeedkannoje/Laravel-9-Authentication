@@ -2,10 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\VerificationMail;
+use App\Events\WelcomeMailEvent;
+use App\Mail\WelcomeMail;
 use App\Models\Post;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
+
 class PostController extends Controller
 {
     /**
@@ -13,34 +18,19 @@ class PostController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index ()
+    public function index()
     {
-   
-
-        
-
-        if(request('status')){
-
-            $posts = Post::where('user_id' , Auth::user()->id)->where('status' ,request('status')) ->simplepaginate(5)->withQueryString();
-            return view("post.index",[
-                "data" => $posts,
-            ]);
-        } 
-
-        $search = request()->query('search');
-        if($search ){
-            // dd(request()->query('search'));
-            $posts = Post::where('user_id' , Auth::user()->id)->where('title' , 'LIKE', "%{$search}%" )->simplepaginate(5)->withQueryString();
+        $posts = Post::where('user_id', auth()->user()->id);
+        if (request()->has('status')) {
+            $posts->where('status', request('status'));
         }
-        else{
-          $posts = Post::where('user_id' , Auth::user()->id)->simplepaginate(4);
-
-    
+        if (request()->has('search')) {
+            $posts->where('title', 'LIKE', "%" . Request('search') . "%");
         }
+        $posts = $posts->simplepaginate(5)->withQueryString();
         return view("post.index", [
             "data" => $posts,
         ]);
-   
     }
 
     /**
@@ -50,7 +40,7 @@ class PostController extends Controller
      */
     public function create()
     {
-        return view("post.create" );
+        return view("post.create");
     }
 
     /**
@@ -61,43 +51,38 @@ class PostController extends Controller
      */
     public function store(Request $request)
     {
-        //
-
-        // dd($request);
-
+    
         $request->validate([
             'title' => 'required|max:100|unique:posts,title',
             'description' => 'required',
             'status' => 'required',
             'post_image' => 'image|max:2048|nullable'
         ]);
-        if($request->hasFile('post_image')){
+        if ($request->hasFile('post_image')) {
 
             // get filename with extention
 
             $filenameWithExt = $request->file('post_image')->getClientOriginalName();
             //get just file name
 
-            $filename = pathinfo($filenameWithExt , PATHINFO_FILENAME);
+            $filename = pathinfo($filenameWithExt, PATHINFO_FILENAME);
 
             //get just  ext 
 
             $extension = $request->file('post_image')->getClientOriginalExtension();
 
             //filename to store 
-            $fileNameToStore = $filename . "_". time().".".$extension;
+            $fileNameToStore = $filename . "_" . time() . "." . $extension;
             // upload image
             $path = $request->file('post_image')->storeAs('public/post_image', $fileNameToStore);
-
-
-        }
-        else{
+        } else {
             $fileNameToStore = "noimage.jpg";
         }
 
 
         $post = new Post();
 
+    
         $post->title = $request->title;
         $post->description = $request->description;
         $post->status = $request->status;
@@ -105,10 +90,11 @@ class PostController extends Controller
         $post->user_id = Auth::user()->id;
         $post->save();
 
+        event(new VerificationMail(auth()->user()->email));
         return redirect()->back()->with('message', 'Post Add successfully');
     }
 
-    /**
+    /**php 
      * Display the specified resource.
      *
      * @param  \App\Models\Post  $post
@@ -117,9 +103,7 @@ class PostController extends Controller
     public function show(Post $post)
     {
         //
-
-        return view ('post.show' , compact("post" ,"post"));
-
+        return view('post.show', compact("post", "post"));
     }
 
     /**php 
@@ -147,7 +131,7 @@ class PostController extends Controller
      */
     public function update(Request $request, Post $post)
     {
-// dd($post);
+        // dd($post);
 
         $request->validate([
             'title' => "required|max:100|unique:posts,title,$post->id",
@@ -156,39 +140,36 @@ class PostController extends Controller
             'post_image' => 'image|max:2048|nullable'
 
         ]);
-        if($request->hasFile('post_image')){
+        if ($request->hasFile('post_image')) {
 
             // get filename with extention
 
             $filenameWithExt = $request->file('post_image')->getClientOriginalName();
             //get just file name
 
-            $filename = pathinfo($filenameWithExt , PATHINFO_FILENAME);
+            $filename = pathinfo($filenameWithExt, PATHINFO_FILENAME);
 
             //get just  ext 
 
             $extension = $request->file('post_image')->getClientOriginalExtension();
 
             //filename to store 
-            $fileNameToStore = $filename . "_". time().".".$extension;
+            $fileNameToStore = $filename . "_" . time() . "." . $extension;
             // upload image
             $path = $request->file('post_image')->storeAs('public/post_image', $fileNameToStore);
 
-            Storage::delete('public/post_image/'.$post->post_image );
-
-
+            Storage::delete('public/post_image/' . $post->post_image);
         }
 
 
-        
+
         $post = Post::find($post->id);
 
         $post->title = $request->title;
         $post->description = $request->description;
         $post->status = $request->status;
-        if($request ->hasFile('post_image') ){
-            $post -> post_image = $fileNameToStore;
-
+        if ($request->hasFile('post_image')) {
+            $post->post_image = $fileNameToStore;
         }
         $post->save();
 
@@ -205,8 +186,8 @@ class PostController extends Controller
     {
         // dd($post);
         $post->delete();
-        if($post -> post_image != 'noimage.jpg' ){
-            Storage::delete('public/post_image/'.$post->post_image );
+        if ($post->post_image != 'noimage.jpg') {
+            Storage::delete('public/post_image/' . $post->post_image);
         }
         return redirect()->route('post.index')->with('message', 'post  Delete successfully');
     }
